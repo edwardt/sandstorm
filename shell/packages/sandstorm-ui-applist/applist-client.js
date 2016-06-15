@@ -1,3 +1,5 @@
+import { introJs } from "intro.js";
+
 SandstormAppList = function (db, quotaEnforcer) {
   this._filter = new ReactiveVar("");
   this._sortOrder = new ReactiveVar([["appTitle", 1]]);
@@ -225,14 +227,47 @@ Template.sandstormAppListPage.events({
     }
   },
 });
+Template.sandstormAppListPage.onDestroyed(function() {
+  if (Template.instance().intro) {
+    Template.instance().intro.exit();
+    Template.instance().intro = undefined;
+  }
+});
 Template.sandstormAppListPage.onRendered(function () {
+  const db = Template.instance().data._db;
+  // Set up automatically-opening hint explaining what installing is, if zero apps installed.
+  if(!db.collections.userActions.find().count() && !Session.get("dismissedInstallHint")) {
+    const intro = Template.instance().intro = introJs();
+    intro.setOptions({
+      steps: [
+        {
+          element: document.querySelector(".install-icon"),
+          intro: "<strong>Welcome!</strong><br>Create spreadsheets, documents, and more.<br><br>Get started by installing an app.",
+          position: "right",
+        },
+      ],
+      tooltipPosition: "auto",
+      positionPrecedence: ["right", "top", "left", "bottom"],
+      highlightClass: "grain-list-hide-element",
+      showStepNumbers: false,
+      exitOnOverlayClick: true,
+      overlayOpacity: 0,
+      showBullets: false,
+      doneLabel: "Got it",
+    });
+    intro.oncomplete(function () {
+      Session.set("dismissedInstallHint", true);
+    });
+
+    intro.start();
+  }
+
   // Auto-focus search bar on desktop, but not mobile (on mobile it will open the software
   // keyboard which is undesirable). window.orientation is generally defined on mobile browsers
   // but not desktop browsers, but some mobile browsers don't support it, so we also check
   // clientWidth. Note that it's better to err on the side of not auto-focusing.
   if (window.orientation === undefined && window.innerWidth > 600) {
     // If there are no apps available, don't bother focusing it.
-    const db = Template.instance().data._db;
     if (db.collections.userActions.find().count() === 0) {
       return;
     }
